@@ -1,25 +1,117 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research: Peer Assessment #1"
+author: "Josh Jensen"
+output: html_document
 ---
 
+```{r, echo=FALSE, cache=TRUE}
+setwd("C:/Users/Josh/Dropbox/R/Coursera - Data Science Certificate/5 - Reproducible Research/Peer Assessment 1")
+```
 
-## Loading and preprocessing the data
+## I. Loading and preprocessing the data
 
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
+Load libraries, read in activity.csv, and create data frame without NAs
+```{r, eval=FALSE, cache=TRUE}
+library(dplyr)
+library(knitr)
 
 
+activity <- read.csv("activity.csv")
 
-## Are there differences in activity patterns between weekdays and weekends?
+activity_nona <- activity %>% 
+  filter(!is.na(steps))
+```
+
+## II. What is mean total number of steps taken per day?
+### 1. Calculate the total number of steps taken per day
+
+```{r, cache=TRUE}
+
+dailysteps <- activity_nona %>% group_by(date) %>% summarize(dailysteps=sum(steps))
+```
+ 
+### 2. Make a histogram of the total number of steps taken each day
+```{r, cache=TRUE}
+hist(dailysteps$dailysteps)
+```
+
+### 3. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r, cache=TRUE}
+mean(dailysteps$dailysteps)
+median(dailysteps$dailysteps)
+```
+
+## III. What is the average daily activity pattern?
+### 1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r, cache=TRUE}
+intervalsteps <- activity_nona %>%
+  group_by(interval) %>%
+  summarize(avgsteps=mean(steps))
+intervalsteps
+
+plot(intervalsteps$interval,intervalsteps$avgsteps, type = "l")
+```
+
+     
+### 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+```{r, cache=TRUE}
+intervalsteps %>% filter(avgsteps==max(avgsteps))
+```
+
+## IV. Imputing missing values
+### 1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+```{r, cache=TRUE}
+activity %>% filter(is.na(steps)) %>% summarize(length(date))
+```
+
+### 2. Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+Will use the mean of the 5-minute intervals
+
+
+### 3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r, cache=TRUE}
+activity_imputed <- activity %>% left_join(intervalsteps, by = "interval")
+
+activity_imputed$steps <- ifelse(is.na(activity_imputed$steps),activity_imputed$avgsteps,activity_imputed$steps)
+activity_imputed$avgsteps <- NULL
+
+activity_imputed
+```
+
+### 4. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r, cache=TRUE}
+hist(activity_imputed$steps)
+```
+Values differ substantially. The histogram is now skewed toward the low end values that were imputed.
+
+## V. Are there differences in activity patterns between weekdays and weekends?
+### 1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r, cache=TRUE}
+activity_imputed$weekday <- weekdays(as.Date(activity_imputed$date))
+
+activity_imputed$daytype <- ifelse(grepl("(Saturday|Sunday)",activity_imputed$weekday),"weekend","weekday")
+```
+
+### 2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+
+```{r, cache=TRUE}
+intervalsteps_imputed <- activity_imputed %>%
+  group_by(interval,daytype) %>%
+  summarize(avgsteps=mean(steps))
+
+colors <- c("blue","red")
+
+plot(intervalsteps_imputed$interval,intervalsteps_imputed$avgsteps, type="n")
+temp <- filter(intervalsteps_imputed, daytype=="weekend")
+lines(temp$interval,temp$avgsteps, type="l", col=colors[1])
+temp <- filter(intervalsteps_imputed, daytype=="weekday")
+lines(temp$interval,temp$avgsteps, type="l", col=colors[2])
+legend("topleft", c("weekend","weekday"), lty = 1, col=colors)
+```
